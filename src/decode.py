@@ -86,11 +86,9 @@ def log_liklihood(data: list[int], permutation: list[int]):
 def decode(
     ciphertext: str, 
     has_breakpoint: bool, 
-    n_iter: int = 10000, 
+    n_iter: int = 20000, 
     true_plaintext: list[int] = None,
 ) -> str:
-
-    assert has_breakpoint == False #only support no breakpoints for now
 
     # Lists for tracking quantities to plot later:
     tracking = None
@@ -105,15 +103,34 @@ def decode(
     numerized_true_plaintext = text_to_numbers(true_plaintext) if true_plaintext is not None else None
     accepted_transitions = 0
     
-    F = [i for i in range(len(ALPHABET))]
-    current_log_liklihood = log_liklihood(numerized_ciphertext, F)
+    F1 = [i for i in range(len(ALPHABET))]
+    F2 = [i for i in range(len(ALPHABET))]
+    b = int(len(numerized_ciphertext)/2)
+    current_log_liklihood = log_liklihood(numerized_ciphertext[:b], F1) + log_liklihood(numerized_ciphertext[b:], F2)
     n_iter_since_liklihood_improve = 0
 
     for t in range(n_iter):
 
-        F_p = swap(F)
+        p_break     = 0.4
+        p_swap_each = (1 - p_break) / 2
+        move_type = random.choices(
+            population=[0, 1, 2],   # 0=swap F1, 1=swap F2, 2=move b
+            weights=[p_swap_each, p_swap_each, p_break]
+        )[0]
+        if move_type == 0:           # swap in F1
+            F1_p, F2_p, b_p = swap(F1), F2, b
+        elif move_type == 1:         # swap in F2
+            F1_p, F2_p, b_p = F1, swap(F2), b
+        else:                        # shift breakpoint (+/- 1 step, except at ends)
+            F1_p, F2_p, b_p = F1, F2, b
+            if b_p >= len(numerized_ciphertext) - 1:
+                b_p -= 1
+            elif b_p <= 0:
+                b_p += 1
+            else:
+                b_p = b + random.choice((-1, 1))
 
-        swapped_log_liklihood = log_liklihood(numerized_ciphertext, F_p)
+        swapped_log_liklihood = log_liklihood(numerized_ciphertext[:b], F1_p) + log_liklihood(numerized_ciphertext[b:], F2_p)
 
         log_alpha = min(
             0,
@@ -123,14 +140,14 @@ def decode(
         r= random.random()
 
         if r <= math.exp(log_alpha): #accept
-            F = F_p
+            F1 = F1_p
+            F2 = F2_p
+            b = b_p
             current_log_liklihood = swapped_log_liklihood
             n_iter_since_liklihood_improve = 0
             accepted_transitions+= 1
         else:
             n_iter_since_liklihood_improve
-
-        numerized_plaintext = [F.index(y) for y in numerized_ciphertext]
 
         # Early stopping
         if n_iter_since_liklihood_improve > 100:
@@ -139,10 +156,12 @@ def decode(
         # Tracking information (only needed when plotting liklihoods, etc.)
         if tracking is not None:
             tracking["log_liklihood"].append(current_log_liklihood)
+            numerized_plaintext = [F1.index(y) for y in numerized_ciphertext[:b]] + [F2.index(y) for y in numerized_ciphertext[b:]]
             if numerized_true_plaintext is not None:
                 tracking["decoding_accuracy"].append(sum(a == b for a, b in zip(numerized_plaintext, numerized_true_plaintext)) / len(numerized_plaintext))
             tracking["total_accepted_transitions"].append(accepted_transitions)
     
+    numerized_plaintext = [F1.index(y) for y in numerized_ciphertext[:b]] + [F2.index(y) for y in numerized_ciphertext[b:]]
     plaintext = numbers_to_text(numerized_plaintext)
 
     if tracking is not None:    
