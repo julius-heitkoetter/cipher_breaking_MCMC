@@ -3,7 +3,7 @@ import random
 import math
 
 
-random.seed(0)                 # Seed for reproducibility
+random.seed(0)
 EPS = 1e-10                    # Laplace smoothing constant
 
 def load_inputs():
@@ -69,24 +69,30 @@ def log_liklihood(data: list[int], permutation: list[int]):
     Given a permutation, this computes the log liklihood
     of that permutation occuring
     """
+
+    # Precompute the inverse permutation (for efficiency)
+    inv_perm = [0] * len(permutation)
+    for i, p in enumerate(permutation):
+        inv_perm[p] = i
+
     log_liklihood_of_transitions = [
         math.log(LETTER_TRANSITION_MATRIX
             [
-                permutation.index(data[k]) # applied the inverse permutation
+                inv_perm[data[k]]
             ][
-                permutation.index(data[k-1]) # applied the inverse permutation
+                inv_perm[data[k-1]]
             ]
         )
         for k in range(1, len(data))
     ]
 
-    return math.log(LETTER_PROBS[permutation.index(data[0])]) + sum(log_liklihood_of_transitions)
+    return math.log(LETTER_PROBS[inv_perm[data[0]]]) + sum(log_liklihood_of_transitions)
 
 
 def decode(
     ciphertext: str, 
     has_breakpoint: bool, 
-    n_iter: int = 20000, 
+    n_iter: int = 200000, 
     true_plaintext: list[int] = None,
 ) -> str:
 
@@ -147,10 +153,10 @@ def decode(
             n_iter_since_liklihood_improve = 0
             accepted_transitions+= 1
         else:
-            n_iter_since_liklihood_improve
+            n_iter_since_liklihood_improve += 1
 
         # Early stopping
-        if n_iter_since_liklihood_improve > 100:
+        if n_iter_since_liklihood_improve > 100000:
             break
 
         # Tracking information (only needed when plotting liklihoods, etc.)
