@@ -86,7 +86,7 @@ def log_liklihood(data: list[int], permutation: list[int]):
 def decode(
     ciphertext: str, 
     has_breakpoint: bool, 
-    n_iter: int = 2000, 
+    n_iter: int = 10000, 
     true_plaintext: list[int] = None,
 ) -> str:
 
@@ -106,26 +106,39 @@ def decode(
     accepted_transitions = 0
     
     F = [i for i in range(len(ALPHABET))]
+    current_log_liklihood = log_liklihood(numerized_ciphertext, F)
+    n_iter_since_liklihood_improve = 0
 
     for t in range(n_iter):
 
         F_p = swap(F)
 
+        swapped_log_liklihood = log_liklihood(numerized_ciphertext, F_p)
+
         log_alpha = min(
             0,
-            log_liklihood(numerized_ciphertext, F_p) - log_liklihood(numerized_ciphertext, F)
+            swapped_log_liklihood - current_log_liklihood
         )
 
         r= random.random()
 
         if r <= math.exp(log_alpha): #accept
             F = F_p
+            current_log_liklihood = swapped_log_liklihood
+            n_iter_since_liklihood_improve = 0
             accepted_transitions+= 1
+        else:
+            n_iter_since_liklihood_improve
 
         numerized_plaintext = [F.index(y) for y in numerized_ciphertext]
 
+        # Early stopping
+        if n_iter_since_liklihood_improve > 100:
+            break
+
+        # Tracking information (only needed when plotting liklihoods, etc.)
         if tracking is not None:
-            tracking["log_liklihood"].append(log_liklihood(numerized_ciphertext, F))
+            tracking["log_liklihood"].append(current_log_liklihood)
             if numerized_true_plaintext is not None:
                 tracking["decoding_accuracy"].append(sum(a == b for a, b in zip(numerized_plaintext, numerized_true_plaintext)) / len(numerized_plaintext))
             tracking["total_accepted_transitions"].append(accepted_transitions)
@@ -133,7 +146,7 @@ def decode(
     plaintext = numbers_to_text(numerized_plaintext)
 
     if tracking is not None:    
-        return plaintext, tracking
+        return plaintext, tracking # return tracking if we're tracking
     return plaintext
 
 
