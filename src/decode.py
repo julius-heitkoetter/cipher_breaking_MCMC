@@ -158,7 +158,7 @@ if __name__ == "__main__":
         true_plaintext = file.read()
     
     print("INFO : starting decoding of large segment")
-    plaintext, tracking = decode(ciphertext, False, n_iter=2000, true_plaintext=None)
+    plaintext = decode(ciphertext, False, n_iter=2000, true_plaintext=None)
 
 
 
